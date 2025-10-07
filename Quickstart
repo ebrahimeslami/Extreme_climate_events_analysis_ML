@@ -1,0 +1,39 @@
+🚀 Quickstart
+
+To download all datasets (1979–2024), including ERA5 if configured:
+
+python download_data.py --quickstart
+
+
+or simply:
+
+python download_data.py
+
+
+To run without ERA5:
+
+python download_data.py --all --years 1979-2024
+
+
+ERA5 requires a free Copernicus Data Store (CDS) API key:
+
+Create an account: https://cds.climate.copernicus.eu/register
+
+Save credentials to C:\Users\<username>\.cdsapirc (Windows) or ~/.cdsapirc (macOS/Linux).
+
+🧠 Output Structure
+data_raw/
+   ├── nclimdiv/           # NOAA Climate Divisional Data
+   ├── hurdat2/            # Atlantic Hurricane Database
+   ├── storm_events/       # NOAA Storm Events CSVs
+   └── era5/               # Monthly ERA5 NetCDF (subset)
+
+📊 Next Steps
+
+A follow-up module (process_data.py) will:
+
+Derive summer start/end and length
+
+Count annual heatwave/flood/hurricane events
+
+Aggregate to regional trend datasets under data_processed/
