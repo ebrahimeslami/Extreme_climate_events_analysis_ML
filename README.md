@@ -13,7 +13,7 @@ The tool automatically retrieves:
 - **NOAA nClimDiv:** monthly temperature and precipitation
 - **NOAA HURDAT2:** Atlantic hurricane tracks and intensities
 - **NOAA Storm Events:** flood, rainfall, and severe weather reports
-- **Copernicus ERA5:** monthly reanalysis (2 m temperature and total precipitation)
+- **Copernicus ERA5:** monthly temperature, precipitation, winds, SST, and pressure fields
 
 ---
 
