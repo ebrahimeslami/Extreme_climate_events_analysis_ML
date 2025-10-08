@@ -1,0 +1,4 @@
+requests
+tqdm
+python-dateutil
+cdsapi  # only needed if you use --era5

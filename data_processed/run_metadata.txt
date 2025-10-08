@@ -1,0 +1,8 @@
+ERA5 Gulf Summer Study
+Generated: 2025-10-08T12:11:38.562537
+Files merged: 5
+ - era5_gulf_1979_1988_unzipped.nc
+ - era5_gulf_1989_1998_unzipped.nc
+ - era5_gulf_1999_2008_unzipped.nc
+ - era5_gulf_2009_2018_unzipped.nc
+ - era5_gulf_2019_2024_unzipped.nc
