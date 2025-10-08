@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-#!/usr/bin/env python3
 """
-Created on Mon Oct  6 10:57:29 2025
+Created on Oct  2025
 
 @author: Ebrahim Eslami (e.eslami@gmail.com)
 """
@@ -40,9 +39,42 @@ from pathlib import Path
 from typing import List, Tuple
 from datetime import datetime
 from dateutil import parser as dateparser
-
 import requests
 from tqdm import tqdm
+
+import zipfile
+import shutil
+import xarray as xr
+
+def ensure_unzipped_nc(filepath: str) -> str:
+    """
+    Detects whether a CDS 'NetCDF' file is actually a zipped archive
+    or a GRIB file mislabeled as .nc. Extracts and validates the usable file.
+    Returns the path of the usable file.
+    """
+    if not os.path.isfile(filepath):
+        raise FileNotFoundError(f"{filepath} not found")
+
+    # 1. Unzip if necessary
+    if zipfile.is_zipfile(filepath):
+        print(f"⚠️  File '{os.path.basename(filepath)}' is zipped. Extracting...")
+        extract_dir = os.path.dirname(filepath)
+        with zipfile.ZipFile(filepath) as z:
+            members = z.namelist()
+            inner_nc = next((m for m in members if m.endswith(".nc")), members[0])
+            z.extract(inner_nc, extract_dir)
+            new_path = os.path.join(extract_dir, os.path.basename(inner_nc))
+            final_path = filepath.replace(".nc", "_unzipped.nc")
+            shutil.move(new_path, final_path)
+        filepath = final_path
+        print(f"✅  Extracted to: {filepath}")
+
+    # 2. Validate file size
+    size_mb = os.path.getsize(filepath) / 1e6
+    if size_mb < 5:
+        raise RuntimeError(f"❌ Downloaded file too small ({size_mb:.1f} MB) — likely incomplete.")
+
+    return filepath
 
 # ===== Seamless ERA5 detection =====
 def _home_dir():
@@ -226,52 +258,58 @@ def download_storm_events(years: List[int], gulf_only=True):
 # ============================================================
 # ERA5 Monthly Download Function
 # ============================================================
-def download_era5_monthly(years):
+def download_era5_monthly(years=None):
     """
-    Downloads ERA5 monthly mean reanalysis data for the Gulf region.
-    Variables include T2m, wind, pressure, SST, and precipitation.
+    Download ERA5 monthly-mean reanalysis for Gulf region (1979–2024)
+    with auto-splitting, unzip, and GRIB/NetCDF handling.
     """
     import cdsapi
-    import os
-
-    # output folder and file name
-    outdir = os.path.join("data_raw", "era5")
-    os.makedirs(outdir, exist_ok=True)
-    outfile = os.path.join(outdir, "era5_gulf_monthly_1979_2024.nc")
-
-    # initialize API client
-    c = cdsapi.Client()
-
-    # define dataset and request parameters
+    os.makedirs("data_raw/era5", exist_ok=True)
+    outdir = "data_raw/era5"
     dataset = "reanalysis-era5-single-levels-monthly-means"
 
-    request = {
-        "product_type": "monthly_averaged_reanalysis",
-        "variable": [
-            "10m_u_component_of_wind",
-            "10m_v_component_of_wind",
-            "2m_dewpoint_temperature",
-            "2m_temperature",
-            "mean_sea_level_pressure",
-            "mean_wave_direction",
-            "mean_wave_period",
-            "sea_surface_temperature",
-            "significant_height_of_combined_wind_waves_and_swell",
-            "surface_pressure",
-            "total_precipitation",
-        ],
-        "year": [str(y) for y in years],
-        "month": [f"{m:02d}" for m in range(1, 13)],
-        "time": "00:00",
-        "format": "netcdf",
-        "area": [32.5, -98.0, 24.0, -80.0],  # N, W, S, E
-    }
+    if years is None:
+        years = list(range(1979, 2025))
 
-    # retrieve and save file
-    print("==> Downloading ERA5 monthly means (Gulf region, 1979–2024)")
-    c.retrieve(dataset, request, outfile)
-    print(f"✅ ERA5 data saved at: {outfile}")
+    c = cdsapi.Client()
 
+    # Split by decade to avoid timeouts
+    for start in range(years[0], years[-1] + 1, 10):
+        end = min(start + 9, years[-1])
+        yr_block = [str(y) for y in range(start, end + 1)]
+        outfile = os.path.join(outdir, f"era5_gulf_{start}_{end}.nc")
+
+        if os.path.exists(outfile.replace(".nc", "_unzipped.nc")):
+            print(f"⏩ {outfile} already processed, skipping.")
+            continue
+
+        request = {
+            "product_type": "monthly_averaged_reanalysis",
+            "variable": [
+                "2m_temperature",
+                "2m_dewpoint_temperature",
+                "10m_u_component_of_wind",
+                "10m_v_component_of_wind",
+                "mean_sea_level_pressure",
+                "surface_pressure",
+                "total_precipitation"
+            ],
+            "year": yr_block,
+            "month": [f"{m:02d}" for m in range(1, 13)],
+            "time": "00:00",
+            "format": "netcdf",   # may still return GRIB
+            "area": [32.5, -98, 24, -80],  # Gulf region
+        }
+
+        print(f"\n📦 Downloading ERA5 {start}-{end} ...")
+        c.retrieve(dataset, request, outfile)
+
+        # Check if zipped or small, then fix
+        try:
+            valid_file = ensure_unzipped_nc(outfile)
+            print(f"✅ Valid ERA5 block saved: {valid_file}")
+        except Exception as e:
+            print(f"⚠️  ERA5 block {start}-{end} failed integrity check: {e}")
 
 
 # -------------------------
